@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use serde_json::{json, Result as JsonResult, Value};
+use serde_json;
 use std::{error::Error, fs::File, io::BufReader, path::PathBuf};
 
 use super::*;
@@ -12,37 +12,24 @@ macro_rules! tok {
     };
 }
 
-fn tokenize(input: &str) -> TokenizerResult<Vec<Token>> {
-    let mut tokenizer = Tokenizer::new(input);
-    let mut tokens = Vec::new();
-    loop {
-        match tokenizer.next() {
-            Ok(token) => {
-                if token.kind == TokenKind::EOF {
-                    tokens.push(token);
-                    return Ok(tokens);
-                }
-                tokens.push(token);
-            }
-            Err(e) => return Err(e),
-        }
-    }
+fn tokenize(input: &str) -> Result<Vec<Token>, SyntaxError> {
+    Tokenizer::new(input, None).into_iter().collect()
 }
 
-fn assert_tokens(input: &str, expected: Vec<Token>) -> TokenizerResult<()> {
+fn assert_tokens(input: &str, expected: Vec<Token>) -> Result<(), SyntaxError> {
     let tokens = tokenize(input).unwrap();
     assert_eq!(expected, tokens);
     Ok(())
 }
 
 #[test]
-fn tokenize_empty() -> TokenizerResult<()> {
+fn tokenize_empty() -> Result<(), SyntaxError> {
     let expected = vec![tok!(EOF, "", 1, 1)];
     assert_tokens("", expected)
 }
 
 #[test]
-fn tokenize_comments() -> TokenizerResult<()> {
+fn tokenize_comments() -> Result<(), SyntaxError> {
     let input = r##"
 # a comment
 a=42
@@ -57,7 +44,7 @@ a=42
 }
 
 #[test]
-fn simple_raw_values() -> TokenizerResult<()> {
+fn simple_raw_values() -> Result<(), SyntaxError> {
     let input = "A=a B=1\tC=yes";
     let expected = vec![
         tok!(Assign, "A", 1, 1),

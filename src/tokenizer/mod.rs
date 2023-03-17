@@ -1,7 +1,16 @@
 use std::{collections::VecDeque, str::Chars};
 
+use self::{
+    err::{ErrorKind, SyntaxError},
+    pos::Position,
+    token::*,
+};
+
+pub mod err;
+pub mod pos;
 #[cfg(test)]
 mod tests;
+pub mod token;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State {
@@ -22,72 +31,7 @@ enum State {
     ExpansionValueEscape,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Position {
-    pub line: usize,
-    pub column: usize,
-}
-impl Position {
-    pub fn new(line: usize, column: usize) -> Self {
-        Self { line, column }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum TokenKind {
-    EOF,
-    Characters,
-    Assign,
-    SimpleExpansion,
-    StartExpansion,
-    ExpansionOperator,
-    EndExpansion,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Token {
-    pub kind: TokenKind,
-    pub value: String,
-    pub position: Position,
-}
-impl Token {
-    pub fn new(kind: TokenKind, value: String, position: Position) -> Self {
-        Self {
-            kind,
-            value,
-            position,
-        }
-    }
-}
-
-impl Into<String> for Token {
-    fn into(self) -> String {
-        self.value
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ErrorKind {
-    Eof,
-    NullCharacter,
-    UnescapedSpecialCharacter,
-    UnterminatedSingleQuotedString,
-    UnterminatedDoubleQuotedString,
-    UnsupportedShellParameter,
-    UnterminatedExpansion,
-    UnsupportedCommandExpansion,
-    UnsupportedCommandOrArithmeticExpansion,
-    ParseError,
-}
-
-impl std::fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{:?}", self))
-    }
-}
-impl std::error::Error for ErrorKind {}
-
-pub type TokenizerResult<T> = Result<T, ErrorKind>;
+pub type TokenizerResult = Result<Token, SyntaxError>;
 
 #[inline(always)]
 fn is_wsnl(ch: char) -> bool {
@@ -127,6 +71,7 @@ fn is_operator(ch: char) -> bool {
 #[derive(Debug)]
 pub struct Tokenizer<'a> {
     input: Chars<'a>,
+    filename: Option<String>,
     done: bool,
     state: State,
     return_states: VecDeque<State>,
@@ -137,14 +82,37 @@ pub struct Tokenizer<'a> {
     reconsume: bool,
     line: usize,
     column: usize,
+    single_quote_pos: Position,
     quoting_stack: VecDeque<Position>,
     expansion_stack: VecDeque<Position>,
 }
 
+impl<'a> Iterator for Tokenizer<'a> {
+    type Item = TokenizerResult;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            if !self.queue.is_empty() {
+                Some(Ok(self.queue.pop_front().unwrap()))
+            } else {
+                None
+            }
+        } else {
+            while self.queue.is_empty() {
+                if let Err(e) = self.run() {
+                    return Some(Err(e));
+                }
+            }
+            Some(Ok(self.queue.pop_front().unwrap()))
+        }
+    }
+}
+
 impl<'a> Tokenizer<'a> {
-    pub fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str, filename: Option<String>) -> Self {
         Self {
             input: input.chars(),
+            filename,
             done: false,
             state: State::AssignmentList,
             return_states: VecDeque::with_capacity(16),
@@ -155,234 +123,235 @@ impl<'a> Tokenizer<'a> {
             cc: '\0',
             line: 1,
             column: 0,
+            single_quote_pos: Position::new(0, 0),
             quoting_stack: VecDeque::with_capacity(8),
             expansion_stack: VecDeque::with_capacity(8),
         }
     }
 
-    pub fn next(&mut self) -> TokenizerResult<Token> {
-        match self.done {
-            false => {
-                while self.queue.is_empty() {
-                    self.run()?;
-                }
-                Ok(self.queue.pop_front().unwrap())
-            }
-            true => {
-                if !self.queue.is_empty() {
-                    Ok(self.queue.pop_front().unwrap())
-                } else {
-                    Err(ErrorKind::Eof)
-                }
-            }
-        }
-    }
-
-    fn run(&mut self) -> TokenizerResult<()> {
+    fn run(&mut self) -> Result<(), SyntaxError> {
         match self.state {
             State::AssignmentList => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => Ok(self.emit_eof()),
-                Ok(c) if is_wsnl(c) => Ok(()),
-                Ok('#') => Ok(self.switch_to(State::Comment)),
-                Ok(c) if is_identifier_start(c) => {
+                None => Ok(self.emit_eof()),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some(c) if is_wsnl(c) => Ok(()),
+                Some('#') => Ok(self.switch_to(State::Comment)),
+                Some(c) if is_identifier_start(c) => {
                     self.buffer(c);
                     Ok(self.switch_to(State::AssignmentName))
                 }
-                _ => Err(ErrorKind::ParseError),
+                Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
             },
             State::Comment => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => Ok(self.emit_eof()),
-                Ok('\n') => Ok(self.switch_to(State::AssignmentList)),
-                Ok(_) => Ok(()),
-                Err(err) => Err(err),
+                None => Ok(self.emit_eof()),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('\n') => Ok(self.switch_to(State::AssignmentList)),
+                Some(_) => Ok(()),
             },
-            State::AssignmentName => match self.consume_the_next_character()? {
-                '=' => {
+            State::AssignmentName => match self.consume_the_next_character() {
+                None => self.err(ErrorKind::Eof),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('=') => {
                     self.flush_buffer(TokenKind::Assign);
                     Ok(self.switch_to(State::AssignmentValue))
                 }
-                c if is_identifier_char(c) => {
+                Some(c) if is_identifier_char(c) => {
                     self.buffer(c);
                     Ok(())
                 }
-                _ => Err(ErrorKind::ParseError),
+                Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
             },
             State::AssignmentValue => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => {
+                None => {
                     self.flush_buffer(TokenKind::Characters);
                     Ok(self.emit_eof())
                 }
-                Err(err) => Err(err),
-                Ok(c) if is_wsnl(c) => {
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some(c) if is_wsnl(c) => {
                     self.flush_buffer(TokenKind::Characters);
                     Ok(self.switch_to(State::AssignmentList))
                 }
-                Ok('\\') => Ok(self.switch_to(State::AssignmentValueEscape)),
-                Ok('\'') => {
+                Some('\\') => Ok(self.switch_to(State::AssignmentValueEscape)),
+                Some('\'') => {
+                    self.single_quote_pos = self.cur_pos();
                     self.return_states.push_back(self.state);
                     Ok(self.switch_to(State::SingleQuoted))
                 }
-                Ok('"') => {
-                    self.quoting_stack.push_back(self.position());
+                Some('"') => {
+                    self.quoting_stack.push_back(self.cur_pos());
                     self.return_states.push_back(self.state);
                     Ok(self.switch_to(State::DoubleQuoted))
                 }
-                Ok('$') => {
+                Some('$') => {
                     self.return_states.push_back(self.state);
                     Ok(self.switch_to(State::Dollar))
                 }
-                Ok(c) if is_shell_special_char(c) => Err(ErrorKind::UnescapedSpecialCharacter),
-                Ok(c) => Ok(self.buffer(c)),
+                Some(c) if is_shell_special_char(c) => {
+                    self.err(ErrorKind::UnescapedSpecialCharacter(c))
+                }
+                Some(c) => Ok(self.buffer(c)),
             },
             State::AssignmentValueEscape => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => {
+                None => {
                     self.buffer('\\');
                     self.flush_buffer(TokenKind::Characters);
                     Ok(self.emit_eof())
                 }
-                Err(e) => Err(e),
-                Ok('\n') => Ok(self.switch_to(State::AssignmentValue)),
-                Ok(c) => {
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('\n') => Ok(self.switch_to(State::AssignmentValue)),
+                Some(c) => {
                     self.buffer(c);
                     Ok(self.switch_to(State::AssignmentValue))
                 }
             },
             State::SingleQuoted => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => Err(ErrorKind::UnterminatedSingleQuotedString),
-                Err(e) => Err(e),
-                Ok('\'') => Ok(self.switch_to_return_state()),
-                Ok(c) => Ok(self.buffer(c)),
+                None => self.unterminated_single_quote(),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('\'') => Ok(self.switch_to_return_state()),
+                Some(c) => Ok(self.buffer(c)),
             },
             State::DoubleQuoted => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => Err(ErrorKind::UnterminatedDoubleQuotedString),
-                Err(e) => Err(e),
-                Ok('`') => Err(ErrorKind::UnsupportedCommandExpansion),
-                Ok('"') => {
+                None => self.unterminated_double_quote(),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('`') => self.err(ErrorKind::UnsupportedCommandExpansion),
+                Some('"') => {
                     self.quoting_stack.pop_back();
                     Ok(self.switch_to_return_state())
                 }
-                Ok('\\') => Ok(self.switch_to(State::DoubleQuotedEscape)),
-                Ok('$') => {
+                Some('\\') => Ok(self.switch_to(State::DoubleQuotedEscape)),
+                Some('$') => {
                     self.return_states.push_back(self.state);
                     Ok(self.switch_to(State::Dollar))
                 }
-                Ok(c) => Ok(self.buffer(c)),
+                Some(c) => Ok(self.buffer(c)),
             },
             State::DoubleQuotedEscape => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => Err(ErrorKind::UnterminatedDoubleQuotedString),
-                Err(e) => Err(e),
-                Ok('\n') => Ok(self.switch_to(State::DoubleQuoted)),
-                Ok(c) if is_dq_escape(c) => {
+                None => self.unterminated_double_quote(),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('\n') => Ok(self.switch_to(State::DoubleQuoted)),
+                Some(c) if is_dq_escape(c) => {
                     self.buffer(c);
                     Ok(self.switch_to(State::DoubleQuoted))
                 }
-                Ok(c) => {
+                Some(c) => {
                     self.buffer('\\');
                     self.buffer(c);
                     Ok(self.switch_to(State::DoubleQuoted))
                 }
             },
             State::Dollar => match self.consume_the_next_character() {
-                Ok(c) if is_shell_special_param(c) => Err(ErrorKind::UnsupportedShellParameter),
-                Ok('(') => Err(ErrorKind::UnsupportedCommandOrArithmeticExpansion),
-                Ok('{') => {
-                    self.expansion_stack.push_back(self.position());
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some(c) if is_shell_special_param(c) => {
+                    self.err(ErrorKind::UnsupportedShellParameter(format!("${}", c)))
+                }
+                Some('(') => self.err(ErrorKind::UnsupportedCommandOrArithmeticExpansion),
+                Some('{') => {
+                    self.expansion_stack.push_back(self.cur_pos());
                     self.flush_buffer(TokenKind::Characters);
                     Ok(self.switch_to(State::ComplexExpansionStart))
                 }
-                Ok(c) if is_identifier_char(c) => {
+                Some(c) if is_identifier_char(c) => {
                     self.flush_buffer(TokenKind::Characters);
                     self.buffer(c);
                     Ok(self.switch_to(State::SimpleExpansion))
                 }
-                Ok(_) | Err(ErrorKind::Eof) => {
+                Some(_) | None => {
                     self.buffer('$');
                     Ok(self.reconsume_in_return_state())
                 }
-                Err(e) => Err(e),
             },
             State::SimpleExpansion => match self.consume_the_next_character() {
-                Ok(c) if is_identifier_char(c) => Ok(self.buffer(c)),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some(c) if is_identifier_char(c) => Ok(self.buffer(c)),
                 _ => {
                     self.flush_buffer(TokenKind::SimpleExpansion);
                     Ok(self.reconsume_in_return_state())
                 }
             },
-            State::ComplexExpansionStart => match self.consume_the_next_character()? {
-                c if is_shell_special_param(c) => Err(ErrorKind::UnsupportedShellParameter),
-                c if is_identifier_start(c) => {
+            State::ComplexExpansionStart => match self.consume_the_next_character() {
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some(c) if is_shell_special_param(c) => {
+                    self.err(ErrorKind::UnsupportedShellParameter(format!("${{{}}}", c)))
+                }
+                Some(c) if is_identifier_start(c) => {
                     self.buffer(c);
                     Ok(self.switch_to(State::ComplexExpansion))
                 }
-                _ => Err(ErrorKind::ParseError),
+                Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
+                None => self.err(ErrorKind::Eof),
             },
-            State::ComplexExpansion => match self.consume_the_next_character()? {
-                '}' => {
+            State::ComplexExpansion => match self.consume_the_next_character() {
+                None => self.unterminated_expansion(),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('}') => {
                     self.expansion_stack.pop_back();
                     self.flush_buffer(TokenKind::SimpleExpansion);
                     Ok(self.switch_to_return_state())
                 }
-                c if is_identifier_char(c) => Ok(self.buffer(c)),
-                ':' => {
+                Some(c) if is_identifier_char(c) => Ok(self.buffer(c)),
+                Some(':') => {
                     self.flush_buffer(TokenKind::StartExpansion);
                     self.buffer(':');
                     Ok(self.switch_to(State::ExpansionOperator))
                 }
-                c if is_operator(c) => {
+                Some(c) if is_operator(c) => {
                     self.flush_buffer(TokenKind::StartExpansion);
                     self.emit(TokenKind::ExpansionOperator, c.to_string());
                     Ok(self.switch_to(State::ExpansionValue))
                 }
-                _ => Err(ErrorKind::ParseError),
+                Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
             },
-            State::ExpansionOperator => match self.consume_the_next_character()? {
-                c if is_operator(c) => {
+            State::ExpansionOperator => match self.consume_the_next_character() {
+                None => self.err(ErrorKind::Eof),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some(c) if is_operator(c) => {
                     self.buffer(c);
                     self.flush_buffer(TokenKind::ExpansionOperator);
                     Ok(self.switch_to(State::ExpansionValue))
                 }
-                _ => Err(ErrorKind::ParseError),
+                Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
             },
             State::ExpansionValue => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => Err(ErrorKind::UnterminatedExpansion),
-                Err(e) => Err(e),
-                Ok('`') => Err(ErrorKind::UnsupportedCommandExpansion),
-                Ok('}') => {
+                None => self.unterminated_expansion(),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('`') => self.err(ErrorKind::UnsupportedCommandExpansion),
+                Some('}') => {
                     self.expansion_stack.pop_back();
                     self.flush_buffer(TokenKind::Characters);
                     self.emit(TokenKind::EndExpansion, "}".to_string());
                     Ok(self.switch_to_return_state())
                 }
-                Ok('\\') => Ok(self.switch_to(State::ExpansionValueEscape)),
-                Ok('$') => {
+                Some('\\') => Ok(self.switch_to(State::ExpansionValueEscape)),
+                Some('$') => {
                     self.return_states.push_back(self.state);
                     Ok(self.switch_to(State::Dollar))
                 }
-                Ok('"') => {
-                    self.quoting_stack.push_back(self.position());
+                Some('"') => {
+                    self.quoting_stack.push_back(self.cur_pos());
                     self.return_states.push_back(self.state);
                     Ok(self.switch_to(State::DoubleQuoted))
                 }
-                Ok('\'') => {
+                Some('\'') => {
                     if !self.quoting_stack.is_empty() {
                         self.buffer('\'');
                         Ok(())
                     } else {
+                        self.single_quote_pos = self.cur_pos();
                         self.return_states.push_back(self.state);
                         Ok(self.switch_to(State::SingleQuoted))
                     }
                 }
-                Ok(c) => Ok(self.buffer(c)),
+                Some(c) => Ok(self.buffer(c)),
             },
             State::ExpansionValueEscape => match self.consume_the_next_character() {
-                Err(ErrorKind::Eof) => Err(ErrorKind::UnterminatedExpansion),
-                Err(e) => Err(e),
-                Ok('\n') => Ok(self.switch_to(State::ExpansionValue)),
-                Ok(c) if is_dq_escape(c) => {
+                None => self.unterminated_expansion(),
+                Some('\0') => self.err(ErrorKind::NullCharacter),
+                Some('\n') => Ok(self.switch_to(State::ExpansionValue)),
+                Some(c) if is_dq_escape(c) => {
                     self.buffer(c);
                     Ok(self.switch_to(State::ExpansionValue))
                 }
-                Ok(c) => {
+                Some(c) => {
                     if !self.quoting_stack.is_empty() {
                         self.buffer('\\');
                     }
@@ -411,35 +380,27 @@ impl<'a> Tokenizer<'a> {
         self.reconsume_in(state);
     }
 
-    fn consume_the_next_character(&mut self) -> TokenizerResult<char> {
+    fn consume_the_next_character(&mut self) -> Option<char> {
         if self.reconsume {
             self.reconsume = false;
-            Ok(self.cc)
+            Some(self.cc)
         } else {
-            self.input
-                .next()
-                .ok_or(ErrorKind::Eof)
-                .and_then(|c| self.preprocess_char(c))
+            self.input.next().map(|c| {
+                if c == '\n' {
+                    self.line += 1;
+                    self.column = 0;
+                } else {
+                    self.column += 1;
+                }
+                self.cc = c;
+                c
+            })
         }
-    }
-
-    fn preprocess_char(&mut self, c: char) -> TokenizerResult<char> {
-        if c == '\0' {
-            return Err(ErrorKind::NullCharacter);
-        }
-        if c == '\n' {
-            self.line += 1;
-            self.column = 0;
-        } else {
-            self.column += 1;
-        }
-        self.cc = c;
-        Ok(c)
     }
 
     fn emit(&mut self, kind: TokenKind, value: String) {
         self.queue
-            .push_back(Token::new(kind, value, self.position()))
+            .push_back(Token::new(kind, value, self.cur_pos()))
     }
 
     fn emit_eof(&mut self) {
@@ -459,12 +420,41 @@ impl<'a> Tokenizer<'a> {
 
     fn buffer(&mut self, c: char) {
         if self.buf.is_empty() {
-            self.buf_pos = self.position();
+            self.buf_pos = self.cur_pos();
         }
         self.buf.push(c);
     }
 
-    fn position(&self) -> Position {
+    fn cur_pos(&self) -> Position {
         Position::new(self.line, self.column)
+    }
+
+    fn err<T>(&self, kind: ErrorKind) -> Result<T, SyntaxError> {
+        Err(SyntaxError::new(
+            kind,
+            self.cur_pos(),
+            self.filename.clone(),
+        ))
+    }
+
+    fn err_at<T>(&self, kind: ErrorKind, pos: Position) -> Result<T, SyntaxError> {
+        Err(SyntaxError::new(kind, pos, self.filename.clone()))
+    }
+
+    fn unterminated_single_quote(&mut self) -> Result<(), SyntaxError> {
+        self.err_at(
+            ErrorKind::UnterminatedSingleQuotedString,
+            self.single_quote_pos,
+        )
+    }
+
+    fn unterminated_double_quote(&mut self) -> Result<(), SyntaxError> {
+        let pos = self.quoting_stack.pop_back().unwrap();
+        self.err_at(ErrorKind::UnterminatedDoubleQuotedString, pos)
+    }
+
+    fn unterminated_expansion(&mut self) -> Result<(), SyntaxError> {
+        let pos = self.expansion_stack.pop_back().unwrap();
+        self.err_at(ErrorKind::UnterminatedExpansion, pos)
     }
 }
