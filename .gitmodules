@@ -1,0 +1,3 @@
+[submodule "dotenv-spec"]
+	path = dotenv-spec
+	url = https://github.com/php-xdg/dotenv-spec.git
