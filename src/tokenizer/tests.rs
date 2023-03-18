@@ -65,6 +65,17 @@ fn shell_param_zero() {
     assert!(res.is_err(), "Expected error but got: {:?}", res);
 }
 
+#[test]
+fn dollar_at_eof() -> Result<(), SyntaxError> {
+    let input = "A=$";
+    let expected = vec![
+        tok!(Assign, "A", 1, 1),
+        tok!(Characters, "$", 1, 3),
+        tok!(EOF, "", 1, 4),
+    ];
+    assert_tokens(input, expected)
+}
+
 /// Specification tests
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -123,7 +134,7 @@ fn test_spec() -> AnyRes<()> {
 }
 
 fn assert_spec_err(input: &str, error: &str, desc: &str) {
-    println!("Running {}", desc);
+    // println!("Running {}", desc);
     let result = tokenize(input);
     assert!(
         result.is_err(),
@@ -135,7 +146,7 @@ fn assert_spec_err(input: &str, error: &str, desc: &str) {
 }
 
 fn assert_spec_expected(input: &str, expected: Vec<TestToken>, desc: &str) -> AnyRes<()> {
-    println!("Running {}", desc);
+    // println!("Running {}", desc);
     let result: Vec<_> = tokenize(input)?.into_iter().map(token_to_json).collect();
     assert_eq!(
         expected, result,

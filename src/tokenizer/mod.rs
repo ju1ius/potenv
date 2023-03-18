@@ -78,7 +78,7 @@ pub struct Tokenizer<'a> {
     queue: VecDeque<Token>,
     buf: String,
     buf_pos: Position,
-    cc: char,
+    cc: Option<char>,
     reconsume: bool,
     line: usize,
     column: usize,
@@ -120,7 +120,7 @@ impl<'a> Tokenizer<'a> {
             buf: String::with_capacity(64),
             buf_pos: Position::new(0, 0),
             reconsume: false,
-            cc: '\0',
+            cc: None,
             line: 1,
             column: 0,
             single_quote_pos: Position::new(0, 0),
@@ -383,19 +383,18 @@ impl<'a> Tokenizer<'a> {
     fn consume_the_next_character(&mut self) -> Option<char> {
         if self.reconsume {
             self.reconsume = false;
-            Some(self.cc)
         } else {
-            self.input.next().map(|c| {
+            self.cc = self.input.next().map(|c| {
                 if c == '\n' {
                     self.line += 1;
                     self.column = 0;
                 } else {
                     self.column += 1;
                 }
-                self.cc = c;
                 c
-            })
+            });
         }
+        self.cc
     }
 
     fn emit(&mut self, kind: TokenKind, value: String) {
