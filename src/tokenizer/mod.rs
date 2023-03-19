@@ -151,11 +151,13 @@ where
                 }
                 Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
             },
-            State::Comment => match self.consume_the_next_character() {
-                None => Ok(self.emit_eof()),
-                Some('\0') => self.err(ErrorKind::NullCharacter),
-                Some('\n') => Ok(self.switch_to(State::AssignmentList)),
-                Some(_) => Ok(()),
+            State::Comment => loop {
+                match self.consume_the_next_character() {
+                    None => return Ok(self.emit_eof()),
+                    Some('\0') => return self.err(ErrorKind::NullCharacter),
+                    Some('\n') => return Ok(self.switch_to(State::AssignmentList)),
+                    Some(_) => (),
+                };
             },
             State::AssignmentName => match self.consume_the_next_character() {
                 None => self.err(ErrorKind::Eof),
@@ -213,26 +215,30 @@ where
                     Ok(self.switch_to(State::AssignmentValue))
                 }
             },
-            State::SingleQuoted => match self.consume_the_next_character() {
-                None => self.unterminated_single_quote(),
-                Some('\0') => self.err(ErrorKind::NullCharacter),
-                Some('\'') => Ok(self.switch_to_return_state()),
-                Some(c) => Ok(self.buffer(c)),
+            State::SingleQuoted => loop {
+                match self.consume_the_next_character() {
+                    None => return self.unterminated_single_quote(),
+                    Some('\0') => return self.err(ErrorKind::NullCharacter),
+                    Some('\'') => return Ok(self.switch_to_return_state()),
+                    Some(c) => self.buffer(c),
+                };
             },
-            State::DoubleQuoted => match self.consume_the_next_character() {
-                None => self.unterminated_double_quote(),
-                Some('\0') => self.err(ErrorKind::NullCharacter),
-                Some('`') => self.err(ErrorKind::UnsupportedCommandExpansion),
-                Some('"') => {
-                    self.quoting_stack.pop_back();
-                    Ok(self.switch_to_return_state())
-                }
-                Some('\\') => Ok(self.switch_to(State::DoubleQuotedEscape)),
-                Some('$') => {
-                    self.return_states.push_back(self.state);
-                    Ok(self.switch_to(State::Dollar))
-                }
-                Some(c) => Ok(self.buffer(c)),
+            State::DoubleQuoted => loop {
+                match self.consume_the_next_character() {
+                    None => return self.unterminated_double_quote(),
+                    Some('\0') => return self.err(ErrorKind::NullCharacter),
+                    Some('`') => return self.err(ErrorKind::UnsupportedCommandExpansion),
+                    Some('"') => {
+                        self.quoting_stack.pop_back();
+                        return Ok(self.switch_to_return_state());
+                    }
+                    Some('\\') => return Ok(self.switch_to(State::DoubleQuotedEscape)),
+                    Some('$') => {
+                        self.return_states.push_back(self.state);
+                        return Ok(self.switch_to(State::Dollar));
+                    }
+                    Some(c) => self.buffer(c),
+                };
             },
             State::DoubleQuotedEscape => match self.consume_the_next_character() {
                 None => self.unterminated_double_quote(),
