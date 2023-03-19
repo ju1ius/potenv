@@ -7,6 +7,8 @@ use parser::ParseError;
 
 mod evaluator;
 mod parser;
+#[cfg(test)]
+mod test_utils;
 mod tokenizer;
 
 #[derive(Debug, Error)]

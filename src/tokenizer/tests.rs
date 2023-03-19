@@ -1,10 +1,8 @@
 use serde::Deserialize;
-use serde_json;
-use std::{error::Error, fs::File, io::BufReader, path::PathBuf};
+
+use crate::test_utils::{collect_spec_files, load_spec_file, AnyRes};
 
 use super::*;
-
-type AnyRes<T> = Result<T, Box<dyn Error>>;
 
 macro_rules! tok {
     ($k:ident, $v:literal, $l:literal, $c:literal) => {
@@ -13,7 +11,7 @@ macro_rules! tok {
 }
 
 fn tokenize(input: &str) -> Result<Vec<Token>, SyntaxError> {
-    Tokenizer::new(input, None).into_iter().collect()
+    Tokenizer::new(input.chars(), None).into_iter().collect()
 }
 
 fn assert_tokens(input: &str, expected: Vec<Token>) -> Result<(), SyntaxError> {
@@ -109,8 +107,8 @@ impl ToString for TestCase {
 
 #[test]
 fn test_spec() -> AnyRes<()> {
-    for path in collect_spec_files()?.into_iter() {
-        let tests = load_spec_file(&path)?;
+    for path in collect_spec_files("tokenization").into_iter() {
+        let tests = load_spec_file::<TestCase>(&path)?;
         for (i, case) in tests.into_iter().enumerate() {
             let message = format!(
                 "{:?} > {}: {}",
@@ -154,24 +152,6 @@ fn assert_spec_expected(input: &str, expected: Vec<TestToken>, desc: &str) -> An
         desc, expected, result
     );
     Ok(())
-}
-
-fn collect_spec_files() -> AnyRes<Vec<PathBuf>> {
-    let root =
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?).join("dotenv-spec/tests/tokenization");
-    let mut paths: Vec<_> = std::fs::read_dir(root)?
-        .flat_map(|r| r.map(|e| e.path()))
-        .filter(|p| p.is_file())
-        .collect();
-    paths.sort();
-    Ok(paths)
-}
-
-fn load_spec_file(path: &PathBuf) -> AnyRes<Vec<TestCase>> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let data: Vec<TestCase> = serde_json::from_reader(reader)?;
-    Ok(data)
 }
 
 fn token_to_json(token: Token) -> TestToken {

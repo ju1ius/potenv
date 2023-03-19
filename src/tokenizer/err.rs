@@ -43,7 +43,7 @@ impl std::fmt::Display for ErrorKind {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub struct SyntaxError {
     kind: ErrorKind,
     position: Position,

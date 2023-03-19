@@ -1,13 +1,13 @@
-use std::{collections::HashMap, error::Error, fs::File, io::BufReader, path::PathBuf};
+use std::collections::HashMap;
 
 use serde::Deserialize;
-use serde_json;
 
-use crate::parser::parse;
+use crate::{
+    parser::parse,
+    test_utils::{collect_spec_files, load_spec_file, AnyRes},
+};
 
 use super::{Evaluator, Scope};
-
-type AnyRes<T> = Result<T, Box<dyn Error>>;
 
 macro_rules! scope {
     ($($k:literal: $v:literal),+) => {{
@@ -70,9 +70,9 @@ impl std::fmt::Display for TestCase {
 
 #[test]
 fn test_spec() -> AnyRes<()> {
-    for file in collect_spec_files()? {
+    for file in collect_spec_files("evaluation") {
         println!("File: {}", file.to_str().unwrap());
-        for (i, case) in load_spec_file(&file)?.into_iter().enumerate() {
+        for (i, case) in load_spec_file::<TestCase>(&file)?.into_iter().enumerate() {
             let message = format!("{:?} > {}: {}", file.file_name().unwrap(), i, case);
             println!("{}", message);
             match case {
@@ -125,21 +125,4 @@ fn assert_spec_err(
     assert!(result.is_err());
     println!("Ok");
     Ok(())
-}
-
-fn load_spec_file(path: &PathBuf) -> AnyRes<Vec<TestCase>> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let data: Vec<TestCase> = serde_json::from_reader(reader)?;
-    Ok(data)
-}
-
-fn collect_spec_files() -> AnyRes<Vec<PathBuf>> {
-    let root =
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?).join("dotenv-spec/tests/evaluation");
-    let mut paths: Vec<_> = wax::walk("**/*.json", root)?
-        .flat_map(|r| r.map(|e| e.path().to_path_buf()))
-        .collect();
-    paths.sort();
-    Ok(paths)
 }
