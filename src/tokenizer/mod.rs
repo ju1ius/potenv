@@ -35,37 +35,37 @@ pub type TokenizerResult = Result<Token, SyntaxError>;
 
 #[inline(always)]
 fn is_wsnl(ch: char) -> bool {
-    return matches!(ch, ' ' | '\t' | '\n');
+    matches!(ch, ' ' | '\t' | '\n')
 }
 
 #[inline(always)]
 fn is_identifier_start(ch: char) -> bool {
-    return ch.is_ascii_alphabetic() || ch == '_';
+    ch.is_ascii_alphabetic() || ch == '_'
 }
 
 #[inline(always)]
 fn is_identifier_char(ch: char) -> bool {
-    return ch.is_ascii_alphanumeric() || ch == '_';
+    ch.is_ascii_alphanumeric() || ch == '_'
 }
 
 #[inline(always)]
 fn is_shell_special_char(ch: char) -> bool {
-    return matches!(ch, '|' | '&' | ';' | '<' | '>' | '(' | ')');
+    matches!(ch, '|' | '&' | ';' | '<' | '>' | '(' | ')')
 }
 
 #[inline(always)]
 fn is_shell_special_param(ch: char) -> bool {
-    return ch.is_ascii_digit() || matches!(ch, '@' | '*' | '#' | '?' | '$' | '!' | '-');
+    ch.is_ascii_digit() || matches!(ch, '@' | '*' | '#' | '?' | '$' | '!' | '-')
 }
 
 #[inline(always)]
 fn is_dq_escape(ch: char) -> bool {
-    return matches!(ch, '"' | '$' | '`' | '\\');
+    matches!(ch, '"' | '$' | '`' | '\\')
 }
 
 #[inline(always)]
 fn is_operator(ch: char) -> bool {
-    return matches!(ch, '-' | '=' | '+' | '?');
+    matches!(ch, '-' | '=' | '+' | '?')
 }
 
 #[derive(Debug)]
@@ -138,6 +138,7 @@ where
         }
     }
 
+    #[allow(clippy::unit_arg)]
     fn run(&mut self) -> Result<(), SyntaxError> {
         match self.state {
             State::AssignmentList => match self.consume_the_next_character() {
@@ -421,7 +422,7 @@ where
     fn emit_eof(&mut self) {
         let pos = Position::new(self.line, self.column + 1);
         self.queue
-            .push_back(Token::new(TokenKind::EOF, "".to_string(), pos));
+            .push_back(Token::new(TokenKind::Eof, "".to_string(), pos));
         self.done = true;
     }
 

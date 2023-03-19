@@ -2,7 +2,7 @@ use super::pos::Position;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
-    EOF,
+    Eof,
     Characters,
     Assign,
     SimpleExpansion,

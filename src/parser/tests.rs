@@ -44,5 +44,5 @@ macro_rules! terr {
 fn eof_error_with_empty_iterator() {
     let res = Parser::new(tokenize(vec![])).parse();
     let err = res.expect_err("Sould error.");
-    assert_eq!(ParseError::EOF, err);
+    assert_eq!(ParseError::Eof, err);
 }

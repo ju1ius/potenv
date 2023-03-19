@@ -25,7 +25,7 @@ fn assert_tokens(input: &str, expected: Vec<Token>) -> Result<(), SyntaxError> {
 
 #[test]
 fn tokenize_empty() -> Result<(), SyntaxError> {
-    let expected = vec![tok!(EOF, "", 1, 1)];
+    let expected = vec![tok!(Eof, "", 1, 1)];
     assert_tokens("", expected)
 }
 
@@ -39,7 +39,7 @@ a=42
     let expected = vec![
         tok!(Assign, "a", 3, 1),
         tok!(Characters, "42", 3, 3),
-        tok!(EOF, "", 5, 1),
+        tok!(Eof, "", 5, 1),
     ];
     assert_tokens(input, expected)
 }
@@ -54,7 +54,7 @@ fn simple_raw_values() -> Result<(), SyntaxError> {
         tok!(Characters, "1", 1, 7),
         tok!(Assign, "C", 1, 9),
         tok!(Characters, "yes", 1, 11),
-        tok!(EOF, "", 1, 14),
+        tok!(Eof, "", 1, 14),
     ];
     assert_tokens(input, expected)
 }

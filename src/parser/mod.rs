@@ -17,7 +17,7 @@ use self::ast::*;
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParseError {
     #[error("Unexpected end of input")]
-    EOF,
+    Eof,
     #[error("Unexpected token {0:?}")]
     Unexpected(Token),
     #[error("Unknown expansion operator '{0}'")]
@@ -61,9 +61,9 @@ where
         let mut nodes = Vec::with_capacity(16);
         loop {
             match self.tokens.peek() {
-                None => return Err(ParseError::EOF),
+                None => return Err(ParseError::Eof),
                 Some(Err(_)) => return self.take_err(),
-                match_kind!(EOF) => return Ok(nodes),
+                match_kind!(Eof) => return Ok(nodes),
                 match_kind!(Assign) => nodes.push(self.parse_assignment()?),
                 Some(Ok(_)) => {
                     return Err(ParseError::Unexpected(self.take_cur()?));
@@ -82,9 +82,9 @@ where
         let mut nodes = Vec::new();
         loop {
             match self.tokens.peek() {
-                None => return Err(ParseError::EOF),
+                None => return Err(ParseError::Eof),
                 Some(Err(_)) => return self.take_err(),
-                match_kind!(EOF | Assign) => return Ok(nodes),
+                match_kind!(Eof | Assign) => return Ok(nodes),
                 match_kind!(Characters) => {
                     nodes.push(Expression::Characters(self.take_cur()?.value));
                 }
@@ -112,7 +112,7 @@ where
         let mut nodes = Vec::new();
         loop {
             match self.tokens.peek() {
-                None => return Err(ParseError::EOF),
+                None => return Err(ParseError::Eof),
                 Some(Err(_)) => return self.take_err(),
                 match_kind!(EndExpansion) => {
                     self.tokens.next();
@@ -158,7 +158,7 @@ where
 
     fn expect(&mut self, kind: TokenKind) -> ParseResult<Token> {
         match self.tokens.next() {
-            None => Err(ParseError::EOF),
+            None => Err(ParseError::Eof),
             Some(Ok(token)) if token.kind == kind => Ok(token),
             Some(Ok(token)) => Err(ParseError::Unexpected(token)),
             Some(Err(e)) => Err(ParseError::Syntax(e)),
