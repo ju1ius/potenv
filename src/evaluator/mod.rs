@@ -10,7 +10,7 @@ use crate::{
 #[cfg(test)]
 mod tests;
 
-type Scope = HashMap<String, String>;
+pub type Scope = HashMap<String, String>;
 
 #[derive(Debug, Error)]
 pub enum EvaluationError {
@@ -23,20 +23,20 @@ pub enum EvaluationError {
 type EvaluationResult<T> = Result<T, EvaluationError>;
 
 #[derive(Debug)]
-struct Evaluator<T>
+pub struct Evaluator<'a, T>
 where
     T: EnvProvider,
 {
-    env: T,
+    env: &'a T,
     scope: Scope,
     override_env: bool,
 }
 
-impl<T> Evaluator<T>
+impl<'a, T> Evaluator<'a, T>
 where
     T: EnvProvider,
 {
-    pub fn new(env: T, override_env: bool) -> Self {
+    pub fn new(env: &'a T, override_env: bool) -> Self {
         Self {
             env,
             override_env,
@@ -61,14 +61,13 @@ where
 
     fn evaluate_assignment(&mut self, node: Assignment) -> EvaluationResult<()> {
         let name = node.name;
-        let value = if self.override_env {
-            self.evaluate_expression(node.value)?
+        let value = if let Some(v) = (!self.override_env)
+            .then(|| self.env.get_var(&name))
+            .flatten()
+        {
+            v
         } else {
-            if let Some(v) = self.env.get_var(&name) {
-                v
-            } else {
-                self.evaluate_expression(node.value)?
-            }
+            self.evaluate_expression(node.value)?
         };
         self.scope.insert(name, value);
         Ok(())

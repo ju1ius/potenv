@@ -1,11 +1,14 @@
 #![feature(test)]
 
+use std::path::Path;
+
+use env::{EnvProvider, ProcessEnvProvider};
 use thiserror::Error;
 
-use evaluator::EvaluationError;
-use parser::ParseError;
+use evaluator::{EvaluationError, Evaluator, Scope};
+use parser::{parse, ParseError};
 
-mod env;
+pub mod env;
 mod evaluator;
 mod parser;
 #[cfg(test)]
@@ -18,4 +21,72 @@ pub enum PotenvError {
     ParseError(#[from] ParseError),
     #[error(transparent)]
     EvaluationError(#[from] EvaluationError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
+type PotenvResult<T> = Result<T, PotenvError>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Potenv<T>
+where
+    T: EnvProvider,
+{
+    env: T,
+    override_env: bool,
+}
+
+impl Default for Potenv<ProcessEnvProvider> {
+    fn default() -> Self {
+        Self::new(ProcessEnvProvider, false)
+    }
+}
+
+impl<T> Potenv<T>
+where
+    T: EnvProvider,
+{
+    pub fn new(env: T, override_env: bool) -> Self {
+        Self { env, override_env }
+    }
+
+    pub fn override_env(&mut self, override_env: bool) -> &Self {
+        self.override_env = override_env;
+        self
+    }
+
+    pub fn provider(&mut self, provider: T) -> &Self {
+        self.env = provider;
+        self
+    }
+
+    pub fn load<I, P>(&mut self, files: I) -> PotenvResult<Scope>
+    where
+        P: AsRef<Path>,
+        I: Iterator<Item = P>,
+    {
+        let scope = self.evaluate(files)?;
+        for (name, value) in scope.iter() {
+            if self.override_env || self.env.get_var(name).is_none() {
+                self.env.set_var(name, value);
+            }
+        }
+        Ok(scope)
+    }
+
+    pub fn evaluate<I, P>(&self, files: I) -> PotenvResult<Scope>
+    where
+        P: AsRef<Path>,
+        I: Iterator<Item = P>,
+    {
+        let mut eval = Evaluator::new(&self.env, self.override_env);
+        for file in files {
+            let path = file.as_ref();
+            let input = std::fs::read_to_string(path)?;
+            let filename = path.to_string_lossy();
+            let ast = parse(&input, Some(&filename))?;
+            eval.evaluate(ast)?;
+        }
+        Ok(eval.into_env())
+    }
 }

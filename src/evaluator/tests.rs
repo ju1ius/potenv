@@ -20,7 +20,7 @@ macro_rules! scope {
 
 fn eval(input: &str, env: Scope, override_env: bool) -> AnyRes<Scope> {
     let provider = HashMapProvider::from(env);
-    let mut eval = Evaluator::new(provider, override_env);
+    let mut eval = Evaluator::new(&provider, override_env);
     let ast = parse(input, Some("<test>"))?;
     eval.evaluate(ast)?;
     Ok(eval.scope())
