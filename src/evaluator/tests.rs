@@ -27,7 +27,7 @@ fn eval(input: &str, env: Option<Scope>, override_env: Option<bool>) -> AnyRes<S
 #[test]
 fn test_bug() -> AnyRes<()> {
     let desc = "test bug";
-    let input = "a=${a:?foo}";
+    let input = "a=${a+${b?}}";
     let env = scope!["a": ""];
     // let expected = scope!["a": ""];
     let error = "ParseError".to_string();

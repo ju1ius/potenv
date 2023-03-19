@@ -27,9 +27,3 @@ impl Token {
         }
     }
 }
-
-impl ToString for Token {
-    fn to_string(&self) -> String {
-        self.value.clone()
-    }
-}

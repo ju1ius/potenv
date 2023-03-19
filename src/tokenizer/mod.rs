@@ -50,7 +50,7 @@ fn is_identifier_char(ch: char) -> bool {
 
 #[inline(always)]
 fn is_shell_special_char(ch: char) -> bool {
-    return matches!(ch, '`' | '|' | '&' | ';' | '<' | '>' | '(' | ')');
+    return matches!(ch, '|' | '&' | ';' | '<' | '>' | '(' | ')');
 }
 
 #[inline(always)]
@@ -160,7 +160,7 @@ where
                 };
             },
             State::AssignmentName => match self.consume_the_next_character() {
-                None => self.err(ErrorKind::Eof),
+                None => self.err_eof(),
                 Some('\0') => self.err(ErrorKind::NullCharacter),
                 Some('=') => {
                     self.flush_buffer(TokenKind::Assign);
@@ -197,6 +197,7 @@ where
                     self.return_states.push_back(self.state);
                     Ok(self.switch_to(State::Dollar))
                 }
+                Some('`') => self.err(ErrorKind::UnsupportedCommandExpansion),
                 Some(c) if is_shell_special_char(c) => {
                     self.err(ErrorKind::UnescapedSpecialCharacter(c))
                 }
@@ -293,7 +294,7 @@ where
                     Ok(self.switch_to(State::ComplexExpansion))
                 }
                 Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
-                None => self.err(ErrorKind::Eof),
+                None => self.err_eof(),
             },
             State::ComplexExpansion => match self.consume_the_next_character() {
                 None => self.unterminated_expansion(),
@@ -317,7 +318,7 @@ where
                 Some(c) => self.err(ErrorKind::InvalidCharacter(c)),
             },
             State::ExpansionOperator => match self.consume_the_next_character() {
-                None => self.err(ErrorKind::Eof),
+                None => self.err_eof(),
                 Some('\0') => self.err(ErrorKind::NullCharacter),
                 Some(c) if is_operator(c) => {
                     self.buffer(c);
@@ -451,8 +452,12 @@ where
         ))
     }
 
-    fn err_at<T>(&self, kind: ErrorKind, pos: Position) -> Result<T, SyntaxError> {
+    fn err_at(&self, kind: ErrorKind, pos: Position) -> Result<(), SyntaxError> {
         Err(SyntaxError::new(kind, pos, self.filename.clone()))
+    }
+
+    fn err_eof(&self) -> Result<(), SyntaxError> {
+        self.err_at(ErrorKind::Eof, Position::new(self.line, self.column + 1))
     }
 
     fn unterminated_single_quote(&mut self) -> Result<(), SyntaxError> {

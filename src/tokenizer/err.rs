@@ -52,15 +52,15 @@ pub struct SyntaxError {
 
 impl std::fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.kind.fmt(f)?;
-        if let Some(file) = self.filename.as_ref() {
-            f.write_str(" in ")?;
-            f.write_str(file.as_str())?;
+        self.kind().fmt(f)?;
+        if let Some(file) = self.file().as_ref() {
+            f.write_fmt(format_args!(" in {file}"))?;
         }
-        f.write_str(" on line ")?;
-        self.line().fmt(f)?;
-        f.write_str(", column ")?;
-        self.column().fmt(f)
+        f.write_fmt(format_args!(
+            " on line {}, column {}",
+            self.line(),
+            self.column()
+        ))
     }
 }
 

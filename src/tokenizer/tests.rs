@@ -1,3 +1,4 @@
+use rstest::rstest;
 use serde::Deserialize;
 
 use crate::test_utils::{collect_spec_files, load_spec_file, AnyRes};
@@ -11,7 +12,9 @@ macro_rules! tok {
 }
 
 fn tokenize(input: &str) -> Result<Vec<Token>, SyntaxError> {
-    Tokenizer::new(input.chars(), None).into_iter().collect()
+    Tokenizer::new(input.chars(), Some("<test>".into()))
+        .into_iter()
+        .collect()
 }
 
 fn assert_tokens(input: &str, expected: Vec<Token>) -> Result<(), SyntaxError> {
@@ -56,22 +59,24 @@ fn simple_raw_values() -> Result<(), SyntaxError> {
     assert_tokens(input, expected)
 }
 
-#[test]
-fn shell_param_zero() {
-    let input = "A=${0}";
-    let res = tokenize(input);
-    assert!(res.is_err(), "Expected error but got: {:?}", res);
-}
-
-#[test]
-fn dollar_at_eof() -> Result<(), SyntaxError> {
-    let input = "A=$";
-    let expected = vec![
-        tok!(Assign, "A", 1, 1),
-        tok!(Characters, "$", 1, 3),
-        tok!(EOF, "", 1, 4),
-    ];
-    assert_tokens(input, expected)
+#[rstest]
+#[case("&", 1, 1)]
+#[case("abc", 1, 4)]
+#[case("a=b&c", 1, 4)]
+#[case("a='0\n\x00'", 2, 1)]
+#[case("a='1\n2\n3", 1, 3)]
+#[case("a=\"1\n2\n3", 1, 3)]
+#[case("a=${a-1\n2\n3", 1, 4)]
+#[case("a=\"1\n2\n${3}\"", 3, 3)]
+#[case("#x\na=`pwd`", 2, 3)]
+#[case("#x\na=$(pwd)", 2, 4)]
+fn test_error_position(#[case] input: &str, #[case] line: usize, #[case] col: usize) {
+    let res = tokenize(input).unwrap_err();
+    let expected = format!("on line {line}, column {col}");
+    assert!(
+        res.to_string().contains(&expected),
+        "expected position ({line}, {col}) but got {res:?}"
+    );
 }
 
 /// Specification tests
