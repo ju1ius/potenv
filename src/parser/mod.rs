@@ -9,12 +9,12 @@ use thiserror::Error;
 use crate::tokenizer::{
     err::SyntaxError,
     token::{Token, TokenKind},
-    Tokenizer,
+    Tokenizer, TokenizerResult,
 };
 
 use self::ast::*;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParseError {
     #[error("Unexpected end of input")]
     EOF,
@@ -29,7 +29,9 @@ pub enum ParseError {
 pub type ParseResult<T> = Result<T, ParseError>;
 
 pub fn parse(input: &str, filename: Option<&str>) -> ParseResult<Vec<Assignment>> {
-    Parser::new(input, filename.map(ToString::to_string)).parse()
+    let filename = filename.map(ToString::to_string);
+    let tokenizer = Tokenizer::new(input.chars(), filename);
+    Parser::new(tokenizer).parse()
 }
 
 macro_rules! match_kind {
@@ -38,21 +40,27 @@ macro_rules! match_kind {
     };
 }
 
-pub struct Parser<'a> {
-    tokenizer: Peekable<Tokenizer<'a>>,
+pub struct Parser<I>
+where
+    I: Iterator<Item = TokenizerResult>,
+{
+    tokens: Peekable<I>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(input: &'a str, filename: Option<String>) -> Self {
+impl<I> Parser<I>
+where
+    I: Iterator<Item = TokenizerResult>,
+{
+    pub fn new(tokenizer: I) -> Self {
         Self {
-            tokenizer: Tokenizer::new(input, filename).peekable(),
+            tokens: tokenizer.peekable(),
         }
     }
 
     pub fn parse(&mut self) -> ParseResult<Vec<Assignment>> {
         let mut nodes = Vec::with_capacity(16);
         loop {
-            match self.tokenizer.peek() {
+            match self.tokens.peek() {
                 None => return Err(ParseError::EOF),
                 Some(Err(_)) => return self.take_err(),
                 match_kind!(EOF) => return Ok(nodes),
@@ -73,7 +81,7 @@ impl<'a> Parser<'a> {
     fn parse_assignment_value(&mut self) -> ParseResult<Vec<Expression>> {
         let mut nodes = Vec::new();
         loop {
-            match self.tokenizer.peek() {
+            match self.tokens.peek() {
                 None => return Err(ParseError::EOF),
                 Some(Err(_)) => return self.take_err(),
                 match_kind!(EOF | Assign) => return Ok(nodes),
@@ -103,11 +111,11 @@ impl<'a> Parser<'a> {
     fn parse_expansion_value(&mut self) -> ParseResult<Vec<Expression>> {
         let mut nodes = Vec::new();
         loop {
-            match self.tokenizer.peek() {
+            match self.tokens.peek() {
                 None => return Err(ParseError::EOF),
                 Some(Err(_)) => return self.take_err(),
                 match_kind!(EndExpansion) => {
-                    self.tokenizer.next();
+                    self.tokens.next();
                     return Ok(nodes);
                 }
                 match_kind!(Characters) => {
@@ -148,17 +156,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expect_any(&mut self, kinds: &[TokenKind]) -> ParseResult<Token> {
-        match self.tokenizer.next() {
-            None => Err(ParseError::EOF),
-            Some(Ok(token)) if kinds.contains(&token.kind) => Ok(token),
-            Some(Ok(token)) => Err(ParseError::Unexpected(token)),
-            Some(Err(e)) => Err(e)?,
-        }
-    }
-
     fn expect(&mut self, kind: TokenKind) -> ParseResult<Token> {
-        match self.tokenizer.next() {
+        match self.tokens.next() {
             None => Err(ParseError::EOF),
             Some(Ok(token)) if token.kind == kind => Ok(token),
             Some(Ok(token)) => Err(ParseError::Unexpected(token)),
@@ -167,12 +166,10 @@ impl<'a> Parser<'a> {
     }
 
     fn take_cur(&mut self) -> ParseResult<Token> {
-        Ok(self.tokenizer.next().unwrap()?)
+        Ok(self.tokens.next().unwrap()?)
     }
 
     fn take_err<T>(&mut self) -> ParseResult<T> {
-        Err(ParseError::Syntax(
-            self.tokenizer.next().unwrap().unwrap_err(),
-        ))
+        Err(ParseError::Syntax(self.tokens.next().unwrap().unwrap_err()))
     }
 }

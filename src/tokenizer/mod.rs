@@ -69,8 +69,11 @@ fn is_operator(ch: char) -> bool {
 }
 
 #[derive(Debug)]
-pub struct Tokenizer<'a> {
-    input: Chars<'a>,
+pub struct Tokenizer<I>
+where
+    I: Iterator<Item = char>,
+{
+    input: I,
     filename: Option<String>,
     done: bool,
     state: State,
@@ -87,7 +90,10 @@ pub struct Tokenizer<'a> {
     expansion_stack: VecDeque<Position>,
 }
 
-impl<'a> Iterator for Tokenizer<'a> {
+impl<I> Iterator for Tokenizer<I>
+where
+    I: Iterator<Item = char>,
+{
     type Item = TokenizerResult;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -108,10 +114,13 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
-impl<'a> Tokenizer<'a> {
-    pub fn new(input: &'a str, filename: Option<String>) -> Self {
+impl<I> Tokenizer<I>
+where
+    I: Iterator<Item = char>,
+{
+    pub fn new(input: I, filename: Option<String>) -> Self {
         Self {
-            input: input.chars(),
+            input,
             filename,
             done: false,
             state: State::AssignmentList,
