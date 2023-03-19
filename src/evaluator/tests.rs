@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use crate::{
+    env::HashMapProvider,
     parser::parse,
     test_utils::{collect_spec_files, load_spec_file, AnyRes},
 };
@@ -17,8 +18,9 @@ macro_rules! scope {
     }};
 }
 
-fn eval(input: &str, env: Option<Scope>, override_env: Option<bool>) -> AnyRes<Scope> {
-    let mut eval = Evaluator::new(env.unwrap_or_default(), override_env.unwrap_or(false));
+fn eval(input: &str, env: Scope, override_env: bool) -> AnyRes<Scope> {
+    let provider = HashMapProvider::from(env);
+    let mut eval = Evaluator::new(provider, override_env);
     let ast = parse(input, Some("<test>"))?;
     eval.evaluate(ast)?;
     Ok(eval.scope())
@@ -31,8 +33,8 @@ fn test_bug() -> AnyRes<()> {
     let env = scope!["a": ""];
     // let expected = scope!["a": ""];
     let error = "ParseError".to_string();
-    // assert_spec_expected(desc, input, Some(env), Some(false), expected)?;
-    assert_spec_err(desc, input, Some(env), Some(true), error)?;
+    // assert_spec_expected(desc, input, env, false, expected)?;
+    assert_spec_err(desc, input, env, true, error)?;
     println!("Ok bug!");
     Ok(())
 }
@@ -45,17 +47,19 @@ enum TestCase {
     Success {
         desc: String,
         input: String,
-        env: Option<HashMap<String, String>>,
-        #[serde(rename = "override")]
-        override_env: Option<bool>,
+        #[serde(default)]
+        env: HashMap<String, String>,
+        #[serde(rename = "override", default)]
+        override_env: bool,
         expected: HashMap<String, String>,
     },
     Error {
         desc: String,
         input: String,
-        env: Option<HashMap<String, String>>,
-        #[serde(rename = "override")]
-        override_env: Option<bool>,
+        #[serde(default)]
+        env: HashMap<String, String>,
+        #[serde(rename = "override", default)]
+        override_env: bool,
         error: String,
     },
 }
@@ -103,8 +107,8 @@ fn test_spec() -> AnyRes<()> {
 fn assert_spec_expected(
     desc: &str,
     input: &str,
-    env: Option<HashMap<String, String>>,
-    override_env: Option<bool>,
+    env: HashMap<String, String>,
+    override_env: bool,
     expected: HashMap<String, String>,
 ) -> AnyRes<()> {
     let result = eval(input, env, override_env)?;
@@ -116,8 +120,8 @@ fn assert_spec_expected(
 fn assert_spec_err(
     desc: &str,
     input: &str,
-    env: Option<HashMap<String, String>>,
-    override_env: Option<bool>,
+    env: HashMap<String, String>,
+    override_env: bool,
     _error: String,
 ) -> AnyRes<()> {
     println!("Running: {}", desc);

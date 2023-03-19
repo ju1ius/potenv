@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use crate::parser::ast::{Assignment, Expansion, Expression, Operator};
+use crate::{
+    env::EnvProvider,
+    parser::ast::{Assignment, Expansion, Expression, Operator},
+};
 
 #[cfg(test)]
 mod tests;
@@ -20,14 +23,20 @@ pub enum EvaluationError {
 type EvaluationResult<T> = Result<T, EvaluationError>;
 
 #[derive(Debug)]
-struct Evaluator {
-    env: Scope,
+struct Evaluator<T>
+where
+    T: EnvProvider,
+{
+    env: T,
     scope: Scope,
     override_env: bool,
 }
 
-impl Evaluator {
-    pub fn new(env: Scope, override_env: bool) -> Self {
+impl<T> Evaluator<T>
+where
+    T: EnvProvider,
+{
+    pub fn new(env: T, override_env: bool) -> Self {
         Self {
             env,
             override_env,
@@ -52,10 +61,14 @@ impl Evaluator {
 
     fn evaluate_assignment(&mut self, node: Assignment) -> EvaluationResult<()> {
         let name = node.name;
-        let value = if !self.override_env && self.env.contains_key(&name) {
-            self.env.get(&name).unwrap().clone()
-        } else {
+        let value = if self.override_env {
             self.evaluate_expression(node.value)?
+        } else {
+            if let Some(v) = self.env.get_var(&name) {
+                v
+            } else {
+                self.evaluate_expression(node.value)?
+            }
         };
         self.scope.insert(name, value);
         Ok(())
@@ -117,13 +130,12 @@ impl Evaluator {
         if self.override_env {
             self.scope
                 .get(name)
-                .or_else(|| self.env.get(name))
                 .map(ToOwned::to_owned)
+                .or_else(|| self.env.get_var(name))
         } else {
             self.env
-                .get(name)
-                .or_else(|| self.scope.get(name))
-                .map(ToOwned::to_owned)
+                .get_var(name)
+                .or_else(|| self.scope.get(name).map(ToOwned::to_owned))
         }
     }
 

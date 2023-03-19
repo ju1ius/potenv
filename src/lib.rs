@@ -5,6 +5,7 @@ use thiserror::Error;
 use evaluator::EvaluationError;
 use parser::ParseError;
 
+mod env;
 mod evaluator;
 mod parser;
 #[cfg(test)]
