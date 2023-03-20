@@ -160,9 +160,11 @@ fn assert_spec_expected(input: &str, expected: Vec<TestToken>, desc: &str) -> An
 }
 
 fn token_to_json(token: Token) -> TestToken {
-    let kind = format!("{:?}", token.kind);
     return TestToken {
-        kind,
+        kind: match token.kind {
+            TokenKind::Eof => "EOF".into(),
+            k => format!("{:?}", k),
+        },
         value: token.value,
     };
 }
