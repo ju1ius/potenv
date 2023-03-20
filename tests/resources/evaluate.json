@@ -1,0 +1,46 @@
+[
+  {
+    "desc": "000 - parse error",
+    "files": ["dotenv/000-parse-error.env"],
+    "error": "ParseError"
+  },
+  {
+    "desc": "001 - no env, override=false",
+    "files": ["dotenv/001.env"],
+    "expected": {
+      "FOO": "foo",
+      "BAR": "foobar"
+    }
+  },
+  {
+    "desc": "001 - env, override=false",
+    "files": ["dotenv/001.env"],
+    "env": {
+      "FOO": "env"
+    },
+    "expected": {
+      "FOO": "env",
+      "BAR": "envbar"
+    }
+  },
+  {
+    "desc": "001 - env, override=true",
+    "files": ["dotenv/001.env"],
+    "env": {
+      "FOO": "env"
+    },
+    "override": true,
+    "expected": {
+      "FOO": "foo",
+      "BAR": "foobar"
+    }
+  },
+  {
+    "desc": "scopes from different files are correctly merged",
+    "files": ["dotenv/002a.env", "dotenv/002b.env"],
+    "expected": {
+      "FOO": "baz",
+      "BAR": "foobar"
+    }
+  }
+]

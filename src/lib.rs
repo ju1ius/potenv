@@ -50,13 +50,8 @@ where
         Self { env, override_env }
     }
 
-    pub fn override_env(&mut self, override_env: bool) -> &Self {
+    pub fn override_env(mut self, override_env: bool) -> Self {
         self.override_env = override_env;
-        self
-    }
-
-    pub fn provider(&mut self, provider: T) -> &Self {
-        self.env = provider;
         self
     }
 
