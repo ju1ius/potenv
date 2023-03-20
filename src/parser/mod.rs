@@ -6,13 +6,12 @@ use std::iter::Peekable;
 
 use thiserror::Error;
 
+use self::ast::*;
 use crate::tokenizer::{
     err::SyntaxError,
     token::{Token, TokenKind},
     Tokenizer, TokenizerResult,
 };
-
-use self::ast::*;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParseError {

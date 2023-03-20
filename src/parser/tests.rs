@@ -4,12 +4,11 @@ use std::path::PathBuf;
 
 use test::Bencher;
 
+use super::{parse, Parser};
 use crate::{
     parser::ParseError,
     tokenizer::{token::Token, TokenizerResult},
 };
-
-use super::{parse, Parser};
 
 #[bench]
 fn bench_parse(b: &mut Bencher) {

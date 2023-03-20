@@ -2,13 +2,12 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+use super::{Evaluator, Scope};
 use crate::{
     env::HashMapProvider,
     parser::parse,
     test_utils::{collect_spec_files, load_spec_file, AnyRes},
 };
-
-use super::{Evaluator, Scope};
 
 macro_rules! scope {
     ($($k:literal: $v:literal),+) => {{

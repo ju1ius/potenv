@@ -3,10 +3,9 @@
 use std::path::Path;
 
 use env::{EnvProvider, ProcessEnvProvider};
-use thiserror::Error;
-
 use evaluator::{EvaluationError, Evaluator, Scope};
 use parser::{parse, ParseError};
+use thiserror::Error;
 
 pub mod env;
 mod evaluator;

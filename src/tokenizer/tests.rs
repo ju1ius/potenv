@@ -1,9 +1,8 @@
 use rstest::rstest;
 use serde::Deserialize;
 
-use crate::test_utils::{collect_spec_files, load_spec_file, AnyRes};
-
 use super::*;
+use crate::test_utils::{collect_spec_files, load_spec_file, AnyRes};
 
 macro_rules! tok {
     ($k:ident, $v:literal, $l:literal, $c:literal) => {
