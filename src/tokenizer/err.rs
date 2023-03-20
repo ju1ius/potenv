@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 use super::pos::Position;
@@ -47,14 +49,14 @@ impl std::fmt::Display for ErrorKind {
 pub struct SyntaxError {
     kind: ErrorKind,
     position: Position,
-    filename: Option<String>,
+    filename: Option<PathBuf>,
 }
 
 impl std::fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.kind().fmt(f)?;
         if let Some(file) = self.file().as_ref() {
-            f.write_fmt(format_args!(" in {file}"))?;
+            f.write_fmt(format_args!(" in {}", file.display()))?;
         }
         f.write_fmt(format_args!(
             " on line {}, column {}",
@@ -65,7 +67,7 @@ impl std::fmt::Display for SyntaxError {
 }
 
 impl SyntaxError {
-    pub fn new(kind: ErrorKind, position: Position, filename: Option<String>) -> Self {
+    pub fn new(kind: ErrorKind, position: Position, filename: Option<PathBuf>) -> Self {
         Self {
             kind,
             position,
@@ -85,7 +87,7 @@ impl SyntaxError {
         self.position.column
     }
 
-    pub fn file(&self) -> Option<String> {
+    pub fn file(&self) -> Option<PathBuf> {
         self.filename.clone()
     }
 }

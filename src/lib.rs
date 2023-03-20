@@ -77,8 +77,7 @@ where
         for file in files {
             let path = file.as_ref();
             let input = std::fs::read_to_string(path)?;
-            let filename = path.to_string_lossy();
-            let ast = parse(&input, Some(&filename))?;
+            let ast = parse(&input, Some(path.to_path_buf()))?;
             eval.evaluate(ast)?;
         }
         Ok(eval.into_env())

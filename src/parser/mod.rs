@@ -2,7 +2,7 @@ pub mod ast;
 #[cfg(test)]
 mod tests;
 
-use std::iter::Peekable;
+use std::{iter::Peekable, path::PathBuf};
 
 use thiserror::Error;
 
@@ -27,8 +27,7 @@ pub enum ParseError {
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-pub fn parse(input: &str, filename: Option<&str>) -> ParseResult<Vec<Assignment>> {
-    let filename = filename.map(ToString::to_string);
+pub fn parse(input: &str, filename: Option<PathBuf>) -> ParseResult<Vec<Assignment>> {
     let tokenizer = Tokenizer::new(input.chars(), filename);
     Parser::new(tokenizer).parse()
 }

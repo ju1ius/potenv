@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, path::PathBuf};
 
 use self::{
     err::{ErrorKind, SyntaxError},
@@ -74,7 +74,7 @@ where
     I: Iterator<Item = char>,
 {
     input: I,
-    filename: Option<String>,
+    filename: Option<PathBuf>,
     done: bool,
     state: State,
     return_states: VecDeque<State>,
@@ -118,7 +118,7 @@ impl<I> Tokenizer<I>
 where
     I: Iterator<Item = char>,
 {
-    pub fn new(input: I, filename: Option<String>) -> Self {
+    pub fn new(input: I, filename: Option<PathBuf>) -> Self {
         Self {
             input,
             filename,
