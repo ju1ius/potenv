@@ -1,4 +1,5 @@
 #![feature(test)]
+#![doc = include_str!("../README.md")]
 
 use std::path::Path;
 
@@ -26,6 +27,16 @@ pub enum PotenvError {
 
 type PotenvResult<T> = Result<T, PotenvError>;
 
+/// Loads environment variables from the specified files,
+/// and exports them into the current process's environment.
+pub fn load<I, P>(files: I) -> PotenvResult<Scope>
+where
+    P: AsRef<Path>,
+    I: IntoIterator<Item = P>,
+{
+    Potenv::default().load(files)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Potenv<T>
 where
@@ -49,11 +60,15 @@ where
         Self { env, override_env }
     }
 
+    /// Sets whether variables in dotenv files should override those from the environment provider.
+    /// Defaults to false.
     pub fn override_env(mut self, override_env: bool) -> Self {
         self.override_env = override_env;
         self
     }
 
+    /// Loads environment variables from the specified files,
+    /// and exports them to the current process's environment.
     pub fn load<I, P>(&mut self, files: I) -> PotenvResult<Scope>
     where
         P: AsRef<Path>,
@@ -68,6 +83,8 @@ where
         Ok(scope)
     }
 
+    /// Loads environment variables from the specified files
+    /// without exporting them to the current process's environment.
     pub fn evaluate<I, P>(&self, files: I) -> PotenvResult<Scope>
     where
         P: AsRef<Path>,

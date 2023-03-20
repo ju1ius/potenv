@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 mod utils;
 
 use potenv::{Potenv, PotenvError};
@@ -49,8 +49,7 @@ impl From<&ErrorCase> for Setup {
 
 fn assert_success(case: SuccesCase) -> AnyRes<()> {
     let _setup = Setup::from(&case);
-    let mut potenv = Potenv::default().override_env(case.override_env);
-    potenv.load(case.files)?;
+    load(case.files, case.override_env)?;
     for (k, v) in case.expected {
         let var = std::env::var(k)?;
         assert_eq!(v, var);
@@ -60,14 +59,21 @@ fn assert_success(case: SuccesCase) -> AnyRes<()> {
 
 fn assert_error(case: ErrorCase) -> AnyRes<()> {
     let _setup = Setup::from(&case);
-    let mut potenv = Potenv::default().override_env(case.override_env);
-    let result = potenv.load(case.files);
+    let result = load(case.files, case.override_env);
     match case.error.as_str() {
         "ParseError" => assert!(matches!(result, Err(PotenvError::ParseError(_)))),
         "EvaluationError" => assert!(matches!(result, Err(PotenvError::EvaluationError(_)))),
         _ => assert!(matches!(result, Err(_))),
     }
     Ok(())
+}
+
+fn load(files: Vec<PathBuf>, override_env: bool) -> Result<HashMap<String, String>, PotenvError> {
+    if override_env {
+        Potenv::default().override_env(override_env).load(files)
+    } else {
+        potenv::load(files)
+    }
 }
 
 fn populate_env(vars: &HashMap<String, String>) {

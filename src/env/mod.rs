@@ -3,12 +3,15 @@ mod tests;
 
 use std::collections::HashMap;
 
+/// Trait for environment variable providers.
 pub trait EnvProvider {
     fn get_var(&self, name: &str) -> Option<String>;
 
     fn set_var(&mut self, name: &str, value: &str);
 }
 
+/// An environment variable provider that reads from and writes to
+/// the current process environment.
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessEnvProvider;
 
@@ -22,6 +25,7 @@ impl EnvProvider for ProcessEnvProvider {
     }
 }
 
+/// An environment variable provider that reads from and writes to a HashMap.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct HashMapProvider(HashMap<String, String>);
 
