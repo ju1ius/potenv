@@ -53,7 +53,7 @@ use potenv::{Potenv, env::EnvProvider};
 pub struct Frobnicator;
 
 impl EnvProvider for Frobnicator {
-  fn get_var(&self, name: &str) -> Option<String> {
+  fn var(&self, name: &str) -> Option<String> {
     Some("frobnicated".into())
   }
   fn set_var(&mut self, name: &str, value: &str) {}

@@ -76,7 +76,7 @@ where
     {
         let scope = self.evaluate(files)?;
         for (name, value) in scope.iter() {
-            if self.override_env || self.env.get_var(name).is_none() {
+            if self.override_env || self.env.var(name).is_none() {
                 self.env.set_var(name, value);
             }
         }

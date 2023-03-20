@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 /// Trait for environment variable providers.
 pub trait EnvProvider {
-    fn get_var(&self, name: &str) -> Option<String>;
+    fn var(&self, name: &str) -> Option<String>;
 
     fn set_var(&mut self, name: &str, value: &str);
 }
@@ -16,7 +16,7 @@ pub trait EnvProvider {
 pub struct ProcessEnvProvider;
 
 impl EnvProvider for ProcessEnvProvider {
-    fn get_var(&self, name: &str) -> Option<String> {
+    fn var(&self, name: &str) -> Option<String> {
         std::env::var_os(name).map(|v| v.to_string_lossy().into())
     }
 
@@ -30,7 +30,7 @@ impl EnvProvider for ProcessEnvProvider {
 pub struct HashMapProvider(HashMap<String, String>);
 
 impl EnvProvider for HashMapProvider {
-    fn get_var(&self, name: &str) -> Option<String> {
+    fn var(&self, name: &str) -> Option<String> {
         self.0.get(name).map(ToOwned::to_owned)
     }
 

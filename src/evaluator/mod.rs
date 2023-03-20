@@ -61,10 +61,7 @@ where
 
     fn evaluate_assignment(&mut self, node: Assignment) -> EvaluationResult<()> {
         let name = node.name;
-        let value = if let Some(v) = (!self.override_env)
-            .then(|| self.env.get_var(&name))
-            .flatten()
-        {
+        let value = if let Some(v) = (!self.override_env).then(|| self.env.var(&name)).flatten() {
             v
         } else {
             self.evaluate_expression(node.value)?
@@ -130,10 +127,10 @@ where
             self.scope
                 .get(name)
                 .map(ToOwned::to_owned)
-                .or_else(|| self.env.get_var(name))
+                .or_else(|| self.env.var(name))
         } else {
             self.env
-                .get_var(name)
+                .var(name)
                 .or_else(|| self.scope.get(name).map(ToOwned::to_owned))
         }
     }
