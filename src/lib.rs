@@ -63,7 +63,7 @@ where
     pub fn load<I, P>(&mut self, files: I) -> PotenvResult<Scope>
     where
         P: AsRef<Path>,
-        I: Iterator<Item = P>,
+        I: IntoIterator<Item = P>,
     {
         let scope = self.evaluate(files)?;
         for (name, value) in scope.iter() {
@@ -77,7 +77,7 @@ where
     pub fn evaluate<I, P>(&self, files: I) -> PotenvResult<Scope>
     where
         P: AsRef<Path>,
-        I: Iterator<Item = P>,
+        I: IntoIterator<Item = P>,
     {
         let mut eval = Evaluator::new(&self.env, self.override_env);
         for file in files {
