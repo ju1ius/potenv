@@ -1,0 +1,17 @@
+# https://docs.codecov.com/docs/codecovyml-reference
+coverage:
+  range: 90..100
+  round: down
+  precision: 1
+  status:
+    # https://docs.codecov.com/docs/commit-status
+    project:
+      default:
+        threshold: "1%"
+ignore:
+  - "tests"
+  - "tests.rs"
+  - "test_*.rs"
+comment:
+  layout: "files"
+  require_changes: true

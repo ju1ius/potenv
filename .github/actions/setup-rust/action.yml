@@ -1,0 +1,34 @@
+name: Setup Rust toolchain w/ caching
+description: Specific steps to install and configure Rust
+
+inputs:
+  os:
+    description: The runner os
+    required: true
+  toolchain:
+    description: Rust toolchain to install (stable, nightly)
+    required: true
+    default: stable
+  components:
+    description: The toolchain components to install (i.e. rustfmt, clippy)
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+    - name: cargo generate-lockfile
+      shell: bash
+      if: hashFiles('Cargo.lock') == ''
+      run: cargo generate-lockfile
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+      # Uncomment the following if statement if caching nightly deps
+      # ends up causing too much cache invalidation.
+      if: inputs.rust_toolchain == 'stable'
+      with:
+        # increment this manually to force cache eviction
+        prefix-key: "v0"

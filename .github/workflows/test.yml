@@ -1,0 +1,60 @@
+name: Tests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "main"
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref || github.run_id }}
+  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          os: ubuntu-latest
+          toolchain: stable
+          components: clippy
+      - name: Run clippy
+        # run: cargo clippy --workspace --no-deps -- -D warnings
+        run: cargo clippy --workspace --no-deps
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install stable toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          os: ubuntu-latest
+          components: llvm-tools-preview
+      - name: Install llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Run tests with coverage
+        run: cargo llvm-cov --locked --all-features --lcov --output-path lcov.info
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+  conclusion:
+    needs:
+      - clippy
+      - coverage
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Result
+        run: |
+          jq -C <<< "${needs}"
+          # Check if all needs were successful or skipped.
+          "$(jq -r 'all(.result as $result | (["success", "skipped"] | contains([$result])))' <<< "${needs}")"
+        env:
+          needs: ${{ toJson(needs) }}
