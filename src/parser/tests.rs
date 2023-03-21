@@ -1,14 +1,16 @@
 #![allow(unused_macros)]
 
-use super::Parser;
+use rstest::rstest;
+
+use super::{ast::Assignment, ParseResult, Parser};
 use crate::{
     parser::ParseError,
-    tokenizer::{token::Token, TokenizerResult},
+    tokenizer::{
+        pos::Position,
+        token::{Token, TokenKind},
+        TokenizerResult,
+    },
 };
-
-fn tokenize(tokens: Vec<Token>) -> impl Iterator<Item = TokenizerResult> {
-    tokens.into_iter().map(|t| Ok(t))
-}
 
 macro_rules! tok {
     ($k:ident, $v:literal, $l:literal, $c:literal) => {
@@ -18,6 +20,9 @@ macro_rules! tok {
             Position::new($l, $c),
         ))
     };
+    ($k:ident, $v:literal) => {
+        tok!($k, $v, 0, 0)
+    };
 }
 
 macro_rules! terr {
@@ -26,9 +31,64 @@ macro_rules! terr {
     };
 }
 
-#[test]
-fn eof_error_with_empty_iterator() {
-    let res = Parser::new(tokenize(vec![])).parse();
-    let err = res.expect_err("Sould error.");
-    assert_eq!(ParseError::Eof, err);
+#[rstest]
+#[case::eof_in_assignment_list(
+    vec![],
+    |r| assert!(matches!(r, Err(ParseError::Eof))),
+)]
+#[case::unexpected_in_assignment_list(
+    vec![tok!(Characters, "foo")],
+    |r| assert!(matches!(r, Err(ParseError::Unexpected(_)))),
+)]
+#[case::eof_in_value(
+    vec![tok!(Assign, "foo")],
+    |r| assert!(matches!(r, Err(ParseError::Eof))),
+)]
+#[case::unexpected_in_value(
+    vec![
+        tok!(Assign, "foo"),
+        tok!(ExpansionOperator, "bar")
+    ],
+    |r| assert!(matches!(r, Err(ParseError::Unexpected(_)))),
+)]
+#[case::unexpected_in_operator(
+    vec![
+        tok!(Assign, "foo"),
+        tok!(StartExpansion, "bar"),
+        tok!(Assign, "baz"),
+    ],
+    |r| assert!(matches!(r, Err(ParseError::Unexpected(_)))),
+)]
+#[case::unknown_operator(
+    vec![
+        tok!(Assign, "foo"),
+        tok!(StartExpansion, "bar"),
+        tok!(ExpansionOperator, "<lol>"),
+        tok!(EndExpansion, ""),
+    ],
+    |r| assert!(matches!(r, Err(ParseError::UnknownOperator(_)))),
+)]
+#[case::eof_in_expansion(
+    vec![
+        tok!(Assign, "foo"),
+        tok!(StartExpansion, "bar"),
+        tok!(ExpansionOperator, "-"),
+    ],
+    |r| assert!(matches!(r, Err(ParseError::Eof))),
+)]
+#[case::unexpected_in_expansion(
+    vec![
+        tok!(Assign, "foo"),
+        tok!(StartExpansion, "bar"),
+        tok!(ExpansionOperator, "-"),
+        tok!(Assign, "baz"),
+    ],
+    |r| assert!(matches!(r, Err(ParseError::Unexpected(_)))),
+)]
+fn parse_errors(
+    #[case] input: Vec<TokenizerResult>,
+    #[case] assert: impl Fn(ParseResult<Vec<Assignment>>),
+) {
+    let res = Parser::new(input.into_iter()).parse();
+    assert(res);
 }
