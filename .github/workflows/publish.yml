@@ -15,7 +15,10 @@ jobs:
         with:
           os: ubuntu-latest
           toolchain: stable
-      - run: cargo test --locked --all-features
+      - name: Run tests
+        run: cargo test --locked --all-features
+      - name: Build documentation
+        run: cargo doc --no-deps --locked --all-features
       - run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
