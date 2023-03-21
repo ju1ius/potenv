@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
+use thiserror::Error;
 
-use super::{Evaluator, Scope};
+use super::{EvaluationError, Evaluator, Scope};
 use crate::{
     env::HashMapProvider,
-    parser::parse,
+    parser::{parse, ParseError},
     test_utils::{collect_spec_files, load_spec_file, AnyRes},
 };
 
@@ -17,7 +18,15 @@ macro_rules! scope {
     }};
 }
 
-fn eval(input: &str, env: Scope, override_env: bool) -> AnyRes<Scope> {
+#[derive(Debug, Error)]
+enum EvalError {
+    #[error(transparent)]
+    Parse(#[from] ParseError),
+    #[error(transparent)]
+    Eval(#[from] EvaluationError),
+}
+
+fn eval(input: &str, env: Scope, override_env: bool) -> Result<Scope, EvalError> {
     let provider = HashMapProvider::from(env);
     let mut eval = Evaluator::new(&provider, override_env);
     let ast = parse(input, Some("<test>".into()))?;
@@ -27,46 +36,53 @@ fn eval(input: &str, env: Scope, override_env: bool) -> AnyRes<Scope> {
 
 #[test]
 fn test_bug() -> AnyRes<()> {
-    let desc = "test bug";
-    let input = "a=${a+${b?}}";
-    let env = scope!["a": ""];
-    // let expected = scope!["a": ""];
-    let error = "ParseError".to_string();
-    // assert_spec_expected(desc, input, env, false, expected)?;
-    assert_spec_err(desc, input, env, true, error)?;
-    println!("Ok bug!");
+    assert_spec_err(ErrorCase {
+        desc: "test bug".into(),
+        input: "a=${a+${b?}}".into(),
+        env: scope!["a": ""],
+        override_env: true,
+        error: "UndefinedVariable".into(),
+    })?;
     Ok(())
 }
 
 /// Specification tests
 
+#[derive(Debug, Default, Deserialize)]
+struct SuccessCase {
+    desc: String,
+    input: String,
+    #[serde(default)]
+    env: HashMap<String, String>,
+    #[serde(rename = "override", default)]
+    override_env: bool,
+    expected: HashMap<String, String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ErrorCase {
+    desc: String,
+    input: String,
+    #[serde(default)]
+    env: HashMap<String, String>,
+    #[serde(rename = "override", default)]
+    override_env: bool,
+    error: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum TestCase {
-    Success {
-        desc: String,
-        input: String,
-        #[serde(default)]
-        env: HashMap<String, String>,
-        #[serde(rename = "override", default)]
-        override_env: bool,
-        expected: HashMap<String, String>,
-    },
-    Error {
-        desc: String,
-        input: String,
-        #[serde(default)]
-        env: HashMap<String, String>,
-        #[serde(rename = "override", default)]
-        override_env: bool,
-        error: String,
-    },
+    Success(SuccessCase),
+    Error(ErrorCase),
 }
 
 impl std::fmt::Display for TestCase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Success { desc, .. } | Self::Error { desc, .. } => f.write_str(desc),
+            Self::Success(SuccessCase { desc, .. }) | Self::Error(ErrorCase { desc, .. }) => {
+                f.write_str(desc)
+            }
         }
     }
 }
@@ -79,53 +95,28 @@ fn test_spec() -> AnyRes<()> {
             let message = format!("{:?} > {}: {}", file.file_name().unwrap(), i, case);
             println!("{}", message);
             match case {
-                TestCase::Success {
-                    input,
-                    env,
-                    override_env,
-                    expected,
-                    ..
-                } => {
-                    assert_spec_expected(&message, &input, env, override_env, expected)?;
-                }
-                TestCase::Error {
-                    input,
-                    env,
-                    override_env,
-                    error,
-                    ..
-                } => {
-                    assert_spec_err(&message, &input, env, override_env, error)?;
-                }
-            }
+                TestCase::Success(t) => assert_spec_expected(t)?,
+                TestCase::Error(t) => assert_spec_err(t)?,
+            };
         }
     }
     Ok(())
 }
 
-fn assert_spec_expected(
-    desc: &str,
-    input: &str,
-    env: HashMap<String, String>,
-    override_env: bool,
-    expected: HashMap<String, String>,
-) -> AnyRes<()> {
-    let result = eval(input, env, override_env)?;
-    assert_eq!(expected, result);
+fn assert_spec_expected(case: SuccessCase) -> Result<(), EvalError> {
+    let result = eval(&case.input, case.env, case.override_env)?;
+    assert_eq!(case.expected, result);
     println!("Ok");
     Ok(())
 }
 
-fn assert_spec_err(
-    desc: &str,
-    input: &str,
-    env: HashMap<String, String>,
-    override_env: bool,
-    _error: String,
-) -> AnyRes<()> {
-    println!("Running: {}", desc);
-    let result = eval(input, env, override_env);
-    assert!(result.is_err());
+fn assert_spec_err(case: ErrorCase) -> Result<(), EvalError> {
+    let err = eval(&case.input, case.env, case.override_env).unwrap_err();
+    match case.error.as_str() {
+        "ParseError" => assert!(matches!(err, EvalError::Parse(_))),
+        "UndefinedVariable" => assert!(matches!(err, EvalError::Eval(_))),
+        _ => (),
+    }
     println!("Ok");
     Ok(())
 }
