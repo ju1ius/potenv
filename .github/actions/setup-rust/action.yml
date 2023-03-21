@@ -28,7 +28,7 @@ runs:
       uses: Swatinem/rust-cache@v2
       # Uncomment the following if statement if caching nightly deps
       # ends up causing too much cache invalidation.
-      if: inputs.rust_toolchain == 'stable'
+      if: inputs.toolchain == 'stable'
       with:
         # increment this manually to force cache eviction
         prefix-key: "v0"

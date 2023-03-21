@@ -1,5 +1,7 @@
 # potenv
 
+![Codecov](https://img.shields.io/codecov/c/github/ju1ius/potenv?style=for-the-badge)
+
 A Rust implementation of the [POSIX-compliant dotenv file format specification](https://github.com/php-xdg/dotenv-spec).
 
 ## Usage

@@ -2,6 +2,10 @@
 name = "potenv"
 version = "0.1.0"
 edition = "2021"
+description = "Rust implementation of the POSIX-compliant dotenv file format specification."
+repository = "https://github.com/ju1ius/potenv"
+license-file = "LICENSE"
+include = ["/src"]
 keywords = ["dotenv", "posix", "config", "env", "environment"]
 categories = ["config", "parser-implementations"]
 
