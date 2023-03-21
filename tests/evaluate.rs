@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use potenv::{env::HashMapProvider, Potenv, PotenvError};
+use potenv::{Potenv, PotenvError};
 use utils::{get_resource_path, load_test_cases, AnyRes, ErrorCase, SuccesCase, TestCase};
 
 mod utils;
@@ -11,7 +11,6 @@ mod utils;
 type Scope = HashMap<String, String>;
 
 fn eval(file: impl AsRef<Path>, env: Scope, override_env: bool) -> Result<Scope, PotenvError> {
-    let env = HashMapProvider::from(env);
     let potenv = Potenv::new(env, override_env);
     let scope = potenv.evaluate(vec![PathBuf::from(file.as_ref())])?;
     Ok(scope.collect())
@@ -37,16 +36,14 @@ fn test_evaluate() -> AnyRes<()> {
 }
 
 fn assert_success(case: SuccesCase) -> AnyRes<()> {
-    let env = HashMapProvider::from(case.env);
-    let potenv = Potenv::new(env, case.override_env);
+    let potenv = Potenv::new(case.env, case.override_env);
     let scope = potenv.evaluate(case.files)?;
     assert_eq!(case.expected, scope.collect());
     Ok(())
 }
 
 fn assert_error(case: ErrorCase) -> AnyRes<()> {
-    let env = HashMapProvider::from(case.env);
-    let potenv = Potenv::new(env, case.override_env);
+    let potenv = Potenv::new(case.env, case.override_env);
     let result = potenv.evaluate(case.files);
     match case.error.as_str() {
         "ParseError" => assert!(matches!(result, Err(PotenvError::ParseError(_)))),

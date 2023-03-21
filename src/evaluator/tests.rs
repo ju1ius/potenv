@@ -5,7 +5,6 @@ use thiserror::Error;
 
 use super::{EvaluationError, Evaluator, Scope};
 use crate::{
-    env::HashMapProvider,
     parser::{parse, ParseError},
     test_utils::{collect_spec_files, load_spec_file, AnyRes},
 };
@@ -27,8 +26,7 @@ enum EvalError {
 }
 
 fn eval(input: &str, env: Scope, override_env: bool) -> Result<Scope, EvalError> {
-    let provider = HashMapProvider::from(env);
-    let mut eval = Evaluator::new(&provider, override_env);
+    let mut eval = Evaluator::new(&env, override_env);
     let ast = parse(input, Some("<test>".into()))?;
     eval.evaluate(ast)?;
     Ok(eval.into_scope())

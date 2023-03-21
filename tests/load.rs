@@ -19,7 +19,7 @@ struct Setup(Vec<String>);
 
 impl Setup {
     pub fn new(env: &HashMap<String, String>, expected: &HashMap<String, String>) -> Self {
-        populate_env(env);
+        Self::populate_env(env);
         Self(
             env.keys()
                 .chain(expected.keys())
@@ -27,11 +27,19 @@ impl Setup {
                 .collect(),
         )
     }
+
+    fn populate_env(vars: &HashMap<String, String>) {
+        for (k, v) in vars {
+            std::env::set_var(k, v);
+        }
+    }
 }
 
 impl Drop for Setup {
     fn drop(&mut self) {
-        cleanup_env(self.0.iter());
+        for key in self.0.iter() {
+            std::env::remove_var(key);
+        }
     }
 }
 
@@ -77,16 +85,4 @@ fn load(files: Vec<PathBuf>, override_env: bool) -> Result<HashMap<String, Strin
     } else {
         potenv::load(files)?.collect()
     })
-}
-
-fn populate_env(vars: &HashMap<String, String>) {
-    for (k, v) in vars {
-        std::env::set_var(k, v);
-    }
-}
-
-fn cleanup_env(vars: impl IntoIterator<Item = impl AsRef<str>>) {
-    for key in vars {
-        std::env::remove_var(key.as_ref());
-    }
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{EnvProvider, HashMapProvider, ProcessEnvProvider};
+use super::{EnvProvider, ProcessEnvProvider};
 
 #[test]
 fn test_process_env() {
@@ -15,8 +15,8 @@ fn test_process_env() {
 
 #[test]
 fn test_hashmap() {
-    let mut env = HashMapProvider::from(HashMap::new());
-    let name = "__TEST_VAR__";
+    let mut env = HashMap::new();
+    let name = "FOO";
     let value = "foobar";
     env.set_var(name, value);
     let result = env.var(name).unwrap();

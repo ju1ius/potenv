@@ -25,22 +25,12 @@ impl EnvProvider for ProcessEnvProvider {
     }
 }
 
-/// An environment variable provider that reads from and writes to a HashMap.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct HashMapProvider(HashMap<String, String>);
-
-impl EnvProvider for HashMapProvider {
+impl EnvProvider for HashMap<String, String> {
     fn var(&self, name: &str) -> Option<String> {
-        self.0.get(name).map(ToOwned::to_owned)
+        self.get(name).map(ToOwned::to_owned)
     }
 
     fn set_var(&mut self, name: &str, value: &str) {
-        self.0.insert(name.to_owned(), value.to_owned());
-    }
-}
-
-impl From<HashMap<String, String>> for HashMapProvider {
-    fn from(value: HashMap<String, String>) -> Self {
-        Self(value)
+        self.insert(name.to_owned(), value.to_owned());
     }
 }
