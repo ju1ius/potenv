@@ -5,7 +5,11 @@ edition = "2021"
 description = "Rust implementation of the POSIX-compliant dotenv file format specification."
 repository = "https://github.com/ju1ius/potenv"
 license-file = "LICENSE"
-include = ["/src"]
+include = [
+  "/src",
+  "!**/tests.rs",
+  "!/src/test_utils.rs",
+]
 keywords = ["dotenv", "posix", "config", "env", "environment"]
 categories = ["config", "parser-implementations"]
 
