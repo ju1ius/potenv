@@ -6,6 +6,7 @@ use super::{ast::Assignment, ParseResult, Parser};
 use crate::{
     parser::ParseError,
     tokenizer::{
+        err::{ErrorKind, SyntaxError},
         pos::Position,
         token::{Token, TokenKind},
         TokenizerResult,
@@ -30,11 +31,20 @@ macro_rules! terr {
         Err(ParseError::$e)
     };
 }
+macro_rules! syn_err {
+    ($k:ident) => {
+        Err(SyntaxError::new(ErrorKind::$k, Default::default(), None))
+    };
+}
 
 #[rstest]
 #[case::eof_in_assignment_list(
     vec![],
     |r| assert!(matches!(r, Err(ParseError::Eof))),
+)]
+#[case::err_in_assignment_list(
+    vec![syn_err!(NullCharacter)],
+    |r| assert!(matches!(r, Err(ParseError::Syntax(_)))),
 )]
 #[case::unexpected_in_assignment_list(
     vec![tok!(Characters, "foo")],
@@ -50,6 +60,21 @@ macro_rules! terr {
         tok!(ExpansionOperator, "bar")
     ],
     |r| assert!(matches!(r, Err(ParseError::Unexpected(_)))),
+)]
+#[case::err_in_operator(
+    vec![
+        tok!(Assign, "foo"),
+        tok!(StartExpansion, "bar"),
+        syn_err!(NullCharacter),
+    ],
+    |r| assert!(matches!(r, Err(ParseError::Syntax(_)))),
+)]
+#[case::eof_in_operator(
+    vec![
+        tok!(Assign, "foo"),
+        tok!(StartExpansion, "bar"),
+    ],
+    |r| assert!(matches!(r, Err(ParseError::Eof))),
 )]
 #[case::unexpected_in_operator(
     vec![
