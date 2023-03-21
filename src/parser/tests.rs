@@ -1,23 +1,10 @@
-extern crate test;
+#![allow(unused_macros)]
 
-use std::path::PathBuf;
-
-use test::Bencher;
-
-use super::{parse, Parser};
+use super::Parser;
 use crate::{
     parser::ParseError,
     tokenizer::{token::Token, TokenizerResult},
 };
-
-#[bench]
-fn bench_parse(b: &mut Bencher) {
-    let p = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("benches/resources/big.env");
-    let input = std::fs::read_to_string(&p).unwrap();
-    // let name = p.to_string_lossy().to_string();
-    b.iter(|| parse(&input, None).unwrap())
-}
 
 fn tokenize(tokens: Vec<Token>) -> impl Iterator<Item = TokenizerResult> {
     tokens.into_iter().map(|t| Ok(t))
