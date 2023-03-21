@@ -22,7 +22,7 @@ fn eval(input: &str, env: Scope, override_env: bool) -> AnyRes<Scope> {
     let mut eval = Evaluator::new(&provider, override_env);
     let ast = parse(input, Some("<test>".into()))?;
     eval.evaluate(ast)?;
-    Ok(eval.scope())
+    Ok(eval.into_scope())
 }
 
 #[test]

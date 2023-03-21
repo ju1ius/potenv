@@ -10,12 +10,12 @@ Load environment variables from a `.env` file in the current working directory:
 potenv::load(vec![".env"]).expect("Failed to load .env file.");
 ```
 
-For convenience, loaded variables are returned into a HashMap:
+For convenience, an iterator over the loaded variables is returned:
 
 ```rust
 let vars = potenv::load(vec![".env"]).unwrap();
-for (key, value) in vars {
-  assert_eq!(value, std::env::var(key).unwrap());
+for (name, value) in vars {
+  assert_eq!(value, std::env::var(name).unwrap());
 }
 ```
 
@@ -62,7 +62,7 @@ impl EnvProvider for Frobnicator {
 let vars = Potenv::new(Frobnicator, false)
   .evaluate(vec![".env"])
   .unwrap();
-for (key, value) in vars {
+for (name, value) in vars {
   assert_eq!("frobnicated", value);
 }
 ```

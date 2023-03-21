@@ -51,12 +51,8 @@ where
         Ok(())
     }
 
-    pub fn into_env(self) -> HashMap<String, String> {
+    pub fn into_scope(self) -> HashMap<String, String> {
         self.scope
-    }
-
-    pub fn scope(&self) -> Scope {
-        self.scope.clone()
     }
 
     fn evaluate_assignment(&mut self, node: Assignment) -> EvaluationResult<()> {

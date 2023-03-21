@@ -14,7 +14,7 @@ fn eval(file: impl AsRef<Path>, env: Scope, override_env: bool) -> Result<Scope,
     let env = HashMapProvider::from(env);
     let potenv = Potenv::new(env, override_env);
     let scope = potenv.evaluate(vec![PathBuf::from(file.as_ref())])?;
-    Ok(scope)
+    Ok(scope.collect())
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn assert_success(case: SuccesCase) -> AnyRes<()> {
     let env = HashMapProvider::from(case.env);
     let potenv = Potenv::new(env, case.override_env);
     let scope = potenv.evaluate(case.files)?;
-    assert_eq!(case.expected, scope);
+    assert_eq!(case.expected, scope.collect());
     Ok(())
 }
 

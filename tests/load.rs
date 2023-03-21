@@ -69,11 +69,14 @@ fn assert_error(case: ErrorCase) -> AnyRes<()> {
 }
 
 fn load(files: Vec<PathBuf>, override_env: bool) -> Result<HashMap<String, String>, PotenvError> {
-    if override_env {
-        Potenv::default().override_env(override_env).load(files)
+    Ok(if override_env {
+        Potenv::default()
+            .override_env(override_env)
+            .load(files)?
+            .collect()
     } else {
-        potenv::load(files)
-    }
+        potenv::load(files)?.collect()
+    })
 }
 
 fn populate_env(vars: &HashMap<String, String>) {

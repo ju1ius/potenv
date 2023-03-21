@@ -29,10 +29,10 @@ type PotenvResult<T> = Result<T, PotenvError>;
 
 /// Loads environment variables from the specified files,
 /// and exports them into the current process's environment.
-pub fn load<I, P>(files: I) -> PotenvResult<Scope>
+pub fn load<I>(files: I) -> PotenvResult<impl Iterator<Item = (String, String)>>
 where
-    P: AsRef<Path>,
-    I: IntoIterator<Item = P>,
+    I: IntoIterator,
+    I::Item: AsRef<Path>,
 {
     Potenv::default().load(files)
 }
@@ -69,26 +69,34 @@ where
 
     /// Loads environment variables from the specified files,
     /// and exports them to the current process's environment.
-    pub fn load<I, P>(&mut self, files: I) -> PotenvResult<Scope>
+    pub fn load<I>(&mut self, files: I) -> PotenvResult<impl Iterator<Item = (String, String)>>
     where
-        P: AsRef<Path>,
-        I: IntoIterator<Item = P>,
+        I: IntoIterator,
+        I::Item: AsRef<Path>,
     {
-        let scope = self.evaluate(files)?;
+        let scope = self.eval(files)?;
         for (name, value) in scope.iter() {
             if self.override_env || self.env.var(name).is_none() {
                 self.env.set_var(name, value);
             }
         }
-        Ok(scope)
+        Ok(scope.into_iter())
     }
 
     /// Loads environment variables from the specified files
     /// without exporting them to the current process's environment.
-    pub fn evaluate<I, P>(&self, files: I) -> PotenvResult<Scope>
+    pub fn evaluate<I>(&self, files: I) -> PotenvResult<impl Iterator<Item = (String, String)>>
     where
-        P: AsRef<Path>,
-        I: IntoIterator<Item = P>,
+        I: IntoIterator,
+        I::Item: AsRef<Path>,
+    {
+        Ok(self.eval(files)?.into_iter())
+    }
+
+    fn eval<I>(&self, files: I) -> PotenvResult<Scope>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<Path>,
     {
         let mut eval = Evaluator::new(&self.env, self.override_env);
         for file in files {
@@ -97,6 +105,6 @@ where
             let ast = parse(&input, Some(path.to_path_buf()))?;
             eval.evaluate(ast)?;
         }
-        Ok(eval.into_env())
+        Ok(eval.into_scope())
     }
 }
