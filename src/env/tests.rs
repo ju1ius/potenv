@@ -22,12 +22,3 @@ fn test_hashmap() {
     let result = env.var(name).unwrap();
     assert_eq!(value, result);
 }
-
-#[test]
-fn test_hashmap_provider_from_iter() {
-    let to_str = |(k, v): (&str, &str)| (k.to_string(), v.to_string());
-    let input = [("a", "1"), ("b", "2")];
-    let result: HashMapProvider = input.into_iter().collect();
-    let expected = HashMapProvider::from(HashMap::from_iter(input.into_iter().map(to_str)));
-    assert_eq!(expected, result);
-}

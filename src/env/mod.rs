@@ -44,15 +44,3 @@ impl From<HashMap<String, String>> for HashMapProvider {
         Self(value)
     }
 }
-
-impl<K, V> FromIterator<(K, V)> for HashMapProvider
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
-        Self(HashMap::from_iter(iter.into_iter().map(|(k, v)| {
-            (k.as_ref().to_owned(), v.as_ref().to_owned())
-        })))
-    }
-}
