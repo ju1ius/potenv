@@ -1,6 +1,8 @@
 # potenv
 
-[![Codecov](https://img.shields.io/codecov/c/github/ju1ius/potenv?style=for-the-badge)](https://codecov.io/gh/ju1ius/potenv)
+[![Crates.io](https://img.shields.io/crates/v/potenv?style=for-the-badge&logo=rust)](https://crates.io/crates/potenv)
+[![Docs.rs](https://img.shields.io/badge/docs.rs-potenv-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs)](https://docs.rs/potenv/)
+[![Codecov](https://img.shields.io/codecov/c/github/ju1ius/potenv?style=for-the-badge&logo=codecov&logoColor=eee)](https://codecov.io/gh/ju1ius/potenv)
 
 A Rust implementation of the [POSIX-compliant dotenv file format specification](https://github.com/php-xdg/dotenv-spec).
 
